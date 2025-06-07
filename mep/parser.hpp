@@ -1,13 +1,39 @@
-# MathExprParser
-Mathematical expression parser, AST, Shunting Yard, variable substitution
+#pragma once
+
+#include <string>
+#include <iostream>
+#include <stack>
+
+#include <mep/mep_export.h>
+#include <mep/math.hpp>
+#include <mep/lexer.hpp>
+#include <mep/AST.hpp>
+
+namespace mep {
+// Abstart Syntax Tree
+using AST = Node;
+
+/* Precedence
+   ^ (exponentiation) has precedence over unary - and the binary operators /, *, -, and +.
+   * and / have precedence over unary - and binary - and +.
+   Unary - and + have precedence over binary - and +.
+   ^ is right associative while all other binary operators are left associative
+
+For example :
+   a ^ b * c ^ d + e ^ f / g ^ (h + i) 
+parses to :
+   +( *( ^(a,b), ^(c,d) ), /( ^(e,f), ^(g,+(h,i)) ) )
+and 
+   a - b - c
+parses to 
+   -(-(a,b),c)
+*/
 
 
-
-### Parser
- Thanks : https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-
-
-## Shunting yard algorithm
+//###########################################
+//### Parser
+// https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+/* Shunting yard algorithm
  Basic idea is to keep operators on a stack until both their operands have been parsed
  - maintains up to date two stacks : one for the operators and the other for the operands
  - The key to the algorithm is to keep the operators on the operator stack
@@ -52,29 +78,29 @@ Grammar (non-left-recursive grammar) :
     B --> "+" | "-" | "*" | "/" | "^"
     U --> "-"
 
-   {} indicate zero or n repetitions
+   {} indicate zero or n repitions
    | indicates an alternative
    U unary operator
    B binary operator
    V terminal value
 
-Valid expressions are thus of the form :
+Valid expressions are thus of the form
 E -> T | T B T | T B T B T | T B T B T B T |... ad infinitum
-Parsing routines (pseudo code)
+Parsing routines
 Tokens :
-  U unary operator +- sign, function call
+  U unary operator +- sign
   B binary operator : + - * / ^
   V literal value (or variable)
   LP left parenthesis
   RP right parentheses
   EOF  
 
-Tokenizer routines (Lexer class)
+Token routines
   peek_token() : returns the nex token in the input
   consume_token() : consumes the current token
   expect_token(t) : checks that the next token is t and consumes it
 
-Parser class :
+
 
  parse() {
    parse_E();
@@ -99,3 +125,48 @@ Parser class :
    }
    error("Unexpected);
  }
+
+*/
+
+class MEP_EXPORTS ParserException : public std::exception {
+public:
+   ParserException(const std::string& message)
+      : std::exception(message.c_str())
+   {}
+};
+
+class MEP_EXPORTS Parser {
+   Lexer lexer;
+   bool m_f_debug{ false };
+
+   std::stack<Operator> m_op_stack; // operator (sentinel guarded) stack
+   std::stack<AST*> m_var_stack;     // operands stack (formed as an AST tree)
+   Operator sentinel{};
+   Token* m_previous_token{nullptr};
+public:
+   Parser()
+   {
+
+   }
+  
+   Token* peek_token();
+   void consume_token(Token* tok);
+   void expect_token(TokenType tok);
+
+   void insert_operator_ontop(OperatorToken& tok);
+   Operator reduce_top_operator();
+
+   AST* mk_leaf(const std::string& var);
+   AST* mk_unary(FunctionId& func, AST* child);
+   AST* mk_binary(Operator& op, AST* left, AST* right);
+
+   void parse_T();
+   void parse_E();
+
+   AST* parse(const std::string& input);
+};
+
+
+} // ns
+
+
